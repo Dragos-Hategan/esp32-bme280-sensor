@@ -25,7 +25,7 @@ The code reads raw sensor data over I²C, applies Bosch’s official compensatio
 - **BME280** module (address `0x76` by default, change to `0x77` if needed)
 - Pull-up resistors:
   - Internal pull-ups enabled in code
-  - For longer I²C buses, use external ~4.7 kΩ pull-ups
+  - It is strongly advised to use external 2.2-10kΩ pull-ups
 
 | Signal | GPIO (ESP32) |
 |--------|--------------|
