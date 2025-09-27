@@ -33,8 +33,8 @@ The code reads raw sensor data over I²C, applies Bosch’s official compensatio
 | SCL    | 22           |
 
 ---
-
-![](/docs/Console.png)
+## Console
+![Console Example](/docs/Console.png)
 
 ---
 
