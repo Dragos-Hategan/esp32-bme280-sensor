@@ -34,7 +34,7 @@ The code reads raw sensor data over I²C, applies Bosch’s official compensatio
 
 ---
 
-!(/docs/Console.png)
+![](/docs/Console.png)
 
 ---
 
