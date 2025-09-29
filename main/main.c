@@ -1,9 +1,14 @@
 #include <stdio.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/i2c.h"
+
+// #include "driver/i2c.h"
+#include "driver/i2c_master.h"
+
 #include "esp_log.h"
 #include "esp_err.h"
+
 #include "esp_rom_sys.h"   // esp_rom_delay_us
 
 #include "bme280.h"
@@ -19,24 +24,26 @@ static const char *TAG = "BME280_EX";
 // Alege adresa corectă: 0x76 (SDO=GND) sau 0x77 (SDO=VCC)
 static uint8_t bme280_i2c_addr = BME280_I2C_ADDR_PRIM; // 0x76
 
+static i2c_master_dev_handle_t bme280_handle;
+
 // ==== Callbacks cerute de Bosch API (I2C) ====
 static int8_t bme280_i2c_read(uint8_t reg_addr, uint8_t *data, uint32_t len, void *intf_ptr)
 {
-    uint8_t addr = *(uint8_t *)intf_ptr;
-    esp_err_t err = i2c_master_write_read_device(I2C_PORT, addr, &reg_addr, 1, data, len, pdMS_TO_TICKS(100));
+    (void)intf_ptr;
+    esp_err_t err = i2c_master_transmit_receive(bme280_handle, &reg_addr, 1, data, len, 100);
     return (err == ESP_OK) ? BME280_OK : BME280_E_COMM_FAIL;
 }
 
 static int8_t bme280_i2c_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, void *intf_ptr)
 {
-    uint8_t addr = *(uint8_t *)intf_ptr;
+    (void)intf_ptr;
     // buffer: reg + payload
     uint8_t buf[1 + 32];
     if (len > 32) return BME280_E_INVALID_LEN; // simplu guard; poți aloca dinamic dacă vrei
     buf[0] = reg_addr;
     for (uint32_t i = 0; i < len; i++) buf[1 + i] = data[i];
 
-    esp_err_t err = i2c_master_write_to_device(I2C_PORT, addr, buf, 1 + len, pdMS_TO_TICKS(100));
+    esp_err_t err = i2c_master_transmit(bme280_handle, buf, 1 + len, 100);
     return (err == ESP_OK) ? BME280_OK : BME280_E_COMM_FAIL;
 }
 
@@ -49,24 +56,32 @@ static void bme280_delay_us(uint32_t period, void *intf_ptr)
 // ==== Init I2C driver ====
 static esp_err_t i2c_init(void)
 {
-    i2c_config_t conf = {
-        .mode = I2C_MODE_MASTER,
+    i2c_master_bus_config_t bus_config = {
+        .i2c_port = I2C_PORT,
         .sda_io_num = I2C_SDA_GPIO,
         .scl_io_num = I2C_SCL_GPIO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_FREQ_HZ,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = GPIO_PULLUP_ENABLE,
+        .clk_source = I2C_CLK_SRC_DEFAULT
     };
 
-    esp_err_t ret = i2c_param_config(I2C_PORT, &conf);
+    i2c_master_bus_handle_t bus_handle;
+    esp_err_t ret = i2c_new_master_bus(&bus_config, &bus_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "i2c_param_config failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "i2c_new_master_bus failed: %s", esp_err_to_name(ret));
         return ret;
     }    
 
-    ret = i2c_driver_install(I2C_PORT, conf.mode, 0, 0, 0);
+    i2c_device_config_t bme280_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = bme280_i2c_addr,
+        .scl_speed_hz = I2C_FREQ_HZ,
+        .scl_wait_us = 0
+    };
+
+    ret = i2c_master_bus_add_device(bus_handle, &bme280_config, &bme280_handle);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "i2c_driver_install failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "i2c_master_bus_add_device failed: %s", esp_err_to_name(ret));
         return ret;
     }    
     
