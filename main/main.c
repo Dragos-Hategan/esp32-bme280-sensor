@@ -48,7 +48,7 @@ typedef enum{
     NORMAL_CONTINUOUSLY
 }measurement_choice_t;
 
-measurement_choice_t measurement_choice = NORMAL_CONTINUOUSLY; //// <------------------
+measurement_choice_t measurement_choice = FORCED_PERIODIC_BURST; //// <------------------
 
 /* Parameters */
 #define PERIOD_SECONDS          3       // N seconds between reports
@@ -56,10 +56,16 @@ measurement_choice_t measurement_choice = NORMAL_CONTINUOUSLY; //// <-----------
 #define USE_AVERAGE_IN_BURST    1       // 1 = use average of burst
 #define NORMAL_PULSE_EXTRA_MS   10      // small margin above t_meas
 
-/* -------------------------------------------------------------------------- */
-/*                  Bosch API: I2C callback implementations                   */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * @brief I2C read callback for Bosch BME280 driver.
+ *
+ * @param[in]  reg_addr   Register address to read from.
+ * @param[out] data       Pointer to buffer to store read data.
+ * @param[in]  len        Number of bytes to read.
+ * @param[in]  intf_ptr   Unused, passed by Bosch driver.
+ *
+ * @return BME280_OK on success, else BME280_E_COMM_FAIL.
+ */
 static int8_t bme280_i2c_read(uint8_t reg_addr, uint8_t *data, uint32_t len, void *intf_ptr)
 {
     (void)intf_ptr;
@@ -69,6 +75,16 @@ static int8_t bme280_i2c_read(uint8_t reg_addr, uint8_t *data, uint32_t len, voi
     return (err == ESP_OK) ? BME280_OK : BME280_E_COMM_FAIL;
 }
 
+/**
+ * @brief I2C write callback for Bosch BME280 driver.
+ *
+ * @param[in] reg_addr    Register address to write to.
+ * @param[in] data        Pointer to buffer with payload data.
+ * @param[in] len         Number of payload bytes.
+ * @param[in] intf_ptr    Unused, passed by Bosch driver.
+ *
+ * @return BME280_OK on success, else error code.
+ */
 static int8_t bme280_i2c_write(uint8_t reg_addr, const uint8_t *data, uint32_t len, void *intf_ptr)
 {
     (void)intf_ptr;
@@ -88,16 +104,23 @@ static int8_t bme280_i2c_write(uint8_t reg_addr, const uint8_t *data, uint32_t l
     return (err == ESP_OK) ? BME280_OK : BME280_E_COMM_FAIL;
 }
 
+/**
+ * @brief Delay callback for Bosch BME280 driver.
+ *
+ * @param[in] period     Delay duration in microseconds.
+ * @param[in] intf_ptr   Unused, passed by Bosch driver.
+ */
 static void bme280_delay_us(uint32_t period, void *intf_ptr)
 {
     (void)intf_ptr;
     esp_rom_delay_us(period);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                            I2C bus initialization                           */
-/* -------------------------------------------------------------------------- */
-
+/**
+ * @brief Initialize I2C master bus and attach BME280 device.
+ *
+ * @return ESP_OK on success, else error code.
+ */
 static esp_err_t i2c_init(void)
 {
     i2c_master_bus_config_t bus_config = {
@@ -132,6 +155,12 @@ static esp_err_t i2c_init(void)
     return ESP_OK;
 }
 
+/**
+ * @brief Configure BME280 settings for one-time forced measurement.
+ *
+ * @param[out] dev_settings   Sensor settings structure to update.
+ * @param[out] settings_sel   Bitmask of settings that are modified.
+ */
 static void config_forced_one_time(struct bme280_settings *dev_settings, uint8_t *settings_sel)
 {
     dev_settings->osr_t       = BME280_OVERSAMPLING_2X;            ///< Temperature oversampling
@@ -145,6 +174,12 @@ static void config_forced_one_time(struct bme280_settings *dev_settings, uint8_t
                    BME280_SEL_FILTER;
 }
 
+/**
+ * @brief Configure BME280 settings for forced burst measurements.
+ *
+ * @param[out] dev_settings   Sensor settings structure to update.
+ * @param[out] settings_sel   Bitmask of settings that are modified.
+ */
 static void config_forced_burst(struct bme280_settings *dev_settings, uint8_t *settings_sel)
 {
     dev_settings->osr_t       = BME280_OVERSAMPLING_2X;
@@ -158,6 +193,12 @@ static void config_forced_burst(struct bme280_settings *dev_settings, uint8_t *s
                    BME280_SEL_FILTER;
 }
 
+/**
+ * @brief Configure BME280 settings for normal mode with periodic reads.
+ *
+ * @param[out] dev_settings   Sensor settings structure to update.
+ * @param[out] settings_sel   Bitmask of settings that are modified.
+ */
 static void config_normal_periodic(struct bme280_settings *dev_settings, uint8_t *settings_sel)
 {
     dev_settings->osr_t       = BME280_OVERSAMPLING_2X;
@@ -173,6 +214,12 @@ static void config_normal_periodic(struct bme280_settings *dev_settings, uint8_t
                    BME280_SEL_STANDBY;
 }
 
+/**
+ * @brief Configure BME280 settings for continuous normal operation.
+ *
+ * @param[out] dev_settings   Sensor settings structure to update.
+ * @param[out] settings_sel   Bitmask of settings that are modified.
+ */
 static void config_normal_continuous(struct bme280_settings *dev_settings, uint8_t *settings_sel)
 {
     dev_settings->osr_t       = BME280_OVERSAMPLING_2X;
@@ -188,6 +235,14 @@ static void config_normal_continuous(struct bme280_settings *dev_settings, uint8
                    BME280_SEL_STANDBY;
 }
 
+/**
+ * @brief Apply sensor configuration based on selected measurement mode.
+ *
+ * @param[in]  measurement_choice   Desired measurement type.
+ * @param[in]  dev                  BME280 device handle.
+ *
+ * @return BME280_OK on success, else error code.
+ */
 static int8_t configure_sensor_settings(measurement_choice_t measurement_choice, struct bme280_dev *dev)
 {
     struct bme280_settings dev_settings = {0};
@@ -205,6 +260,14 @@ static int8_t configure_sensor_settings(measurement_choice_t measurement_choice,
     return bme280_set_sensor_settings(settings_sel, &dev_settings, dev);
 }
 
+/**
+ * @brief Wait until measurement is done and read sensor data.
+ *
+ * @param[in]  dev   BME280 device handle.
+ * @param[out] out   Structure to store sensor data.
+ *
+ * @return BME280_OK on success, else error code.
+ */
 static int8_t wait_and_read(struct bme280_dev *dev, struct bme280_data *out)
 {
     // Poll status until measuring is done
@@ -225,6 +288,14 @@ static int8_t wait_and_read(struct bme280_dev *dev, struct bme280_data *out)
     return -1;
 }
 
+/**
+ * @brief Trigger and read a single forced measurement.
+ *
+ * @param[in]  dev   BME280 device handle.
+ * @param[out] out   Structure to store sensor data.
+ *
+ * @return BME280_OK on success, else error code.
+ */
 static int8_t bme_forced_read_once(struct bme280_dev *dev, struct bme280_data *out)
 {
     // Start a FORCED conversion
@@ -234,6 +305,11 @@ static int8_t bme_forced_read_once(struct bme280_dev *dev, struct bme280_data *o
     return wait_and_read(dev, out);
 }
 
+/**
+ * @brief Periodically perform single forced measurements and log results.
+ *
+ * @param[in] dev   BME280 device handle.
+ */
 static void forced_one_time_read(struct bme280_dev *dev)
 {
     struct bme280_data data = {0};
@@ -251,6 +327,12 @@ static void forced_one_time_read(struct bme280_dev *dev)
     }
 }
 
+/**
+ * @brief Accumulate one sample into an accumulator structure.
+ *
+ * @param[in,out] acc   Accumulator to update.
+ * @param[in]     s     Sample to add.
+ */
 static void accum_sample(struct bme280_data *acc, const struct bme280_data *s)
 {
     acc->temperature += s->temperature;
@@ -258,6 +340,11 @@ static void accum_sample(struct bme280_data *acc, const struct bme280_data *s)
     acc->humidity    += s->humidity;
 }
 
+/**
+ * @brief Perform a burst of forced measurements and log averaged or last sample.
+ *
+ * @param[in] dev   BME280 device handle.
+ */
 static void forced_burst_read(struct bme280_dev *dev)
 {
     while (1) {
@@ -294,6 +381,11 @@ static void forced_burst_read(struct bme280_dev *dev)
     }
 }
 
+/**
+ * @brief Perform periodic normal-mode measurements, waking up sensor for each slot.
+ *
+ * @param[in] dev   BME280 device handle.
+ */
 static void normal_periodic_read(struct bme280_dev *dev)
 {
     while (1) {
@@ -320,6 +412,11 @@ static void normal_periodic_read(struct bme280_dev *dev)
     }
 }
 
+/**
+ * @brief Continuously read data while sensor runs in normal mode.
+ *
+ * @param[in] dev   BME280 device handle.
+ */
 static void normal_continuously_read(struct bme280_dev *dev)
 {
     int8_t rslt = bme280_set_sensor_mode(BME280_POWERMODE_NORMAL, dev);
@@ -341,6 +438,12 @@ static void normal_continuously_read(struct bme280_dev *dev)
     }
 }
 
+/**
+ * @brief Start measurement loop according to chosen mode.
+ *
+ * @param[in] measurement_choice   Desired measurement type.
+ * @param[in] dev                  BME280 device handle.
+ */
 static void start_read(measurement_choice_t measurement_choice, struct bme280_dev *dev)
 {
     switch(measurement_choice)
@@ -353,6 +456,10 @@ static void start_read(measurement_choice_t measurement_choice, struct bme280_de
     }
 }
 
+/**
+ * @brief Main entry point of application. Initializes I2C, BME280, applies configuration,
+ *        and starts the measurement loop.
+ */
 void app_main(void)
 {
     ESP_ERROR_CHECK(i2c_init());
