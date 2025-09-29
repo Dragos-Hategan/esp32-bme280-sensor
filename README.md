@@ -8,7 +8,6 @@ It shows four practical acquisition patterns (forced one-shot, forced burst with
 ## Highlights
 
 - Uses the new **`i2c_master_*`** APIs (ESP-IDF 5.x+).
-- Clean separation between **bus init**, **sensor config**, and **read loops**.
 - Four measurement modes you can toggle at compile time.
 - Burst mode computes a **median** per field to reduce outliers.
 - Works at **400 kHz Fast-mode** I²C.
@@ -31,7 +30,15 @@ Each mode has its own sensor settings (oversampling / IIR / standby) chosen as s
 - **Normal periodic:** `osr_t=2x`, `osr_p=4x`, `osr_h=2x`, **IIR=4**, `standby=125 ms`
 - **Normal continuous:** `osr_t=2x`, `osr_p=16x`, `osr_h=2x`, **IIR=4**, `standby=500 ms`
 
-> Tweak these in the `config_*` functions to fit your latency vs. noise budget.
+---
+
+## Configuration
+All user-tunable parameters live in /main/config.h for easy tweaking.
+You can change:
+- I²C settings: port, SDA/SCL pins, bus frequency (400 kHz by default)
+- Stack buffer size used for short writes
+- Measurement mode: choose between FORCED_PERIODIC_ONE_TIME, FORCED_PERIODIC_BURST, NORMAL_PERIODIC, NORMAL_CONTINUOUSLY
+- Timing parameters: report period, burst sample count, median enable, extra margin for NORMAL pulse mode
 
 ---
 
