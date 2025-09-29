@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -53,7 +54,7 @@ measurement_choice_t measurement_choice = FORCED_PERIODIC_BURST; //// <---------
 /* Parameters */
 #define PERIOD_SECONDS          3       // N seconds between reports
 #define BURST_COUNT             5       // number of samples in a burst
-#define USE_AVERAGE_IN_BURST    1       // 1 = use average of burst
+#define USE_MEDIAN_IN_BURST    1       // 1 = use average of burst
 #define NORMAL_PULSE_EXTRA_MS   10      // small margin above t_meas
 
 /**
@@ -328,36 +329,61 @@ static void forced_one_time_read(struct bme280_dev *dev)
 }
 
 /**
- * @brief Accumulate one sample into an accumulator structure.
+ * @brief Comparator for qsort over doubles.
  *
- * @param[in,out] acc   Accumulator to update.
- * @param[in]     s     Sample to add.
+ * @param a Pointer to first element (double).
+ * @param b Pointer to second element (double).
+ * @return <0 if *a < *b, 0 if equal, >0 if *a > *b.
  */
-static void accum_sample(struct bme280_data *acc, const struct bme280_data *s)
+static int cmp_double(const void *a, const void *b)
 {
-    acc->temperature += s->temperature;
-    acc->pressure    += s->pressure;
-    acc->humidity    += s->humidity;
+    double da = *(const double *)a;
+    double db = *(const double *)b;
+    return (da > db) - (da < db);
 }
 
 /**
- * @brief Perform a burst of forced measurements and log averaged or last sample.
+ * @brief Compute the median of a double array in-place.
  *
- * @param[in] dev   BME280 device handle.
+ * Sorts the array using qsort and returns the median value.
+ *
+ * @param v Pointer to the array (will be modified by sorting).
+ * @param n Number of valid elements in @p v.
+ * @return Median value of the first @p n elements.
+ */
+static double median_inplace(double *v, int n)
+{
+    qsort(v, n, sizeof(double), cmp_double);
+    if (n & 1) {
+        return v[n / 2];
+    } else {
+        return 0.5 * (v[n / 2 - 1] + v[n / 2]);
+    }
+}
+
+/**
+ * @brief Perform a burst of forced measurements and log the median sample.
+ *
+ * Collects up to @c BURST_COUNT forced-mode samples and computes the median
+ * for temperature, pressure, and humidity across the valid readings.
+ *
+ * @param[in] dev BME280 device handle.
  */
 static void forced_burst_read(struct bme280_dev *dev)
 {
     while (1) {
-        struct bme280_data acc = {0};
-        struct bme280_data last = {0};
+        double t[BURST_COUNT] = {0};
+        double p[BURST_COUNT] = {0};
+        double h[BURST_COUNT] = {0};
         int good = 0;
 
         for (int i = 0; i < BURST_COUNT; ++i) {
             struct bme280_data s = {0};
             int8_t r = bme_forced_read_once(dev, &s);
             if (r == BME280_OK) {
-                accum_sample(&acc, &s);
-                last = s;
+                t[good] = s.temperature;   /* °C */
+                p[good] = s.pressure;      /* Pa (Bosch driver float) */
+                h[good] = s.humidity;      /* %rH */
                 ++good;
             } else {
                 ESP_LOGW(TAG, "[FORCED_PERIODIC_BURST] sample %d failed: %d", i, r);
@@ -365,14 +391,12 @@ static void forced_burst_read(struct bme280_dev *dev)
         }
 
         if (good > 0) {
-#if USE_AVERAGE_IN_BURST
-            acc.temperature /= good;
-            acc.pressure    /= good;
-            acc.humidity    /= good;
-            ESP_LOGI(TAG, "[FORCED_PERIODIC_BURST-%d avg] T=%.2f°C  P=%.2f hPa  H=%.2f%%", good, acc.temperature, acc.pressure/100.0, acc.humidity);
-#else
-            ESP_LOGI(TAG, "[FORCED_PERIODIC_BURST-%d last] T=%.2f°C  P=%.2f hPa  H=%.2f%%", good, last.temperature, last.pressure/100.0, last.humidity);
-#endif
+            double t_med = median_inplace(t, good);
+            double p_med = median_inplace(p, good);
+            double h_med = median_inplace(h, good);
+
+            ESP_LOGI(TAG, "[FORCED_PERIODIC_BURST] T=%.2f°C  P=%.2f hPa  H=%.2f%%",
+                     good, t_med, p_med / 100.0, h_med);
         } else {
             ESP_LOGW(TAG, "[FORCED_PERIODIC_BURST] no valid samples");
         }
