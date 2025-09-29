@@ -14,6 +14,13 @@ The code reads raw sensor data over I²C, applies Bosch’s official compensatio
   - Temperature (°C)
   - Pressure (Pa)
   - Relative Humidity (%RH)
+- Configurable sensor settings:
+  - Temperature oversampling: 2×
+  - Pressure oversampling: 4×
+  - Humidity oversampling: 1×
+  - IIR filter: coeff 4
+  - Standby time: 125 ms (NORMAL mode only)
+- Sensor runs in **NORMAL mode** (periodic conversions)
 - Logs values to the console using `ESP_LOGI`
 - FreeRTOS task loop (1 s interval)
 
