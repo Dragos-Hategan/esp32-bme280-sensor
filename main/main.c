@@ -6,56 +6,14 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_rom_sys.h"
+
+#include "config.h"
 #include "bme280.h"
 
 static const char *TAG = "BME280_EX";
 
-/* -------------------------------------------------------------------------- */
-/*                         I2C Configuration (edit here)                      */
-/* -------------------------------------------------------------------------- */
-
-/** @brief I2C port used by this example. */
-#define I2C_PORT        I2C_NUM_0
-
-/** @brief SDA pin. Adjust to match your board wiring. */
-#define I2C_SDA_GPIO    23
-
-/** @brief SCL pin. Adjust to match your board wiring. */
-#define I2C_SCL_GPIO    22
-
-/** @brief I2C bus frequency (Hz). 400 kHz Fast mode. */
-#define I2C_FREQ_HZ     (400 * 1000)
-
-/**
- * @brief Maximum payload bytes we pack into a small stack buffer on write.
- *
- * @details
- * The BME280 register writes are short. 32 bytes is plenty for typical cases
- * (control, config, calibration block writes, etc.). If you need more,
- * either increase this or allocate dynamically.
- */
-#define I2C_WRITE_STACK_BUF_MAX   32
-
 /** @brief Handle to the BME280 device on the I2C master bus. */
 static i2c_master_dev_handle_t bme280_handle;
-
-/* -------------------------------------------------------------------------- */
-/*                          Choose A Measurement Type                         */
-/* -------------------------------------------------------------------------- */
-typedef enum{
-    FORCED_PERIODIC_ONE_TIME,
-    FORCED_PERIODIC_BURST,
-    NORMAL_PERIODIC,
-    NORMAL_CONTINUOUSLY
-}measurement_choice_t;
-
-measurement_choice_t measurement_choice = FORCED_PERIODIC_BURST; //// <------------------
-
-/* Parameters */
-#define PERIOD_SECONDS          3       // N seconds between reports
-#define BURST_COUNT             5       // number of samples in a burst
-#define USE_MEDIAN_IN_BURST    1       // 1 = use average of burst
-#define NORMAL_PULSE_EXTRA_MS   10      // small margin above t_meas
 
 /**
  * @brief I2C read callback for Bosch BME280 driver.
