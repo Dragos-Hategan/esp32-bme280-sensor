@@ -24,7 +24,7 @@ esp_err_t i2c_init(i2c_master_dev_handle_t *bme280_handle);
  * @param[in]  reg_addr   Register address to read from.
  * @param[out] data       Pointer to buffer to store read data.
  * @param[in]  len        Number of bytes to read.
- * @param[in]  intf_ptr   Unused, passed by Bosch driver.
+ * @param[in]  intf_ptr   Pointer to the I2C device handle (stored in bme280_dev).
  *
  * @return BME280_OK on success, else BME280_E_COMM_FAIL.
  */
@@ -36,7 +36,7 @@ int8_t bme280_i2c_read(uint8_t reg_addr, uint8_t *data, uint32_t len, void *intf
  * @param[in] reg_addr    Register address to write to.
  * @param[in] data        Pointer to buffer with payload data.
  * @param[in] len         Number of payload bytes.
- * @param[in] intf_ptr    Unused, passed by Bosch driver.
+ * @param[in]  intf_ptr   Pointer to the I2C device handle (stored in bme280_dev).
  *
  * @return BME280_OK on success, else error code.
  */
