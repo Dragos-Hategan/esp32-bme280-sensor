@@ -34,10 +34,8 @@ typedef enum{
     FORCED_PERIODIC_ONE_TIME,
     FORCED_PERIODIC_BURST,
     NORMAL_PERIODIC,
-    NORMAL_CONTINUOUSLY
+    NORMAL_CONTINUOUS
 }measurement_choice_t;
-
-measurement_choice_t measurement_choice = FORCED_PERIODIC_BURST; //// <------------------
 
 /* -------------------------------------------------------------------------- */
 /*                                  Parameters                                */
@@ -47,4 +45,4 @@ measurement_choice_t measurement_choice = FORCED_PERIODIC_BURST; //// <---------
 #define USE_MEDIAN_IN_BURST     1       // 1 = use average of burst
 #define NORMAL_PULSE_EXTRA_MS   10      // small margin above t_meas
 
-#endif
+#endif // CONFIG_H

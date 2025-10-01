@@ -21,7 +21,7 @@ It shows four practical acquisition patterns (forced one-shot, forced burst with
 | `FORCED_PERIODIC_ONE_TIME`| FORCED (one-shot)    | Triggered once per period                             | Low-rate logging, lowest average power        |
 | `FORCED_PERIODIC_BURST`   | FORCED (repeated N)  | `BURST_COUNT` quick one-shots; **median** is logged   | Suppress turbulence/spikes, moderate power    |
 | `NORMAL_PERIODIC`         | NORMAL (short pulse) | Wake to NORMAL, wait one cycle, read, back to SLEEP   | Periodic slotting with decent latency         |
-| `NORMAL_CONTINUOUSLY`     | NORMAL (steady)      | Sensor free-runs; app polls at 1 s                    | Live dashboards; simplest latency profile     |
+| `NORMAL_CONTINUOUS`     | NORMAL (steady)      | Sensor free-runs; app polls at 1 s                    | Live dashboards; simplest latency profile     |
 
 Each mode has its own sensor settings (oversampling / IIR / standby) chosen as sensible defaults:
 
@@ -37,7 +37,7 @@ All user-tunable parameters live in /main/config.h for easy tweaking.
 You can change:
 - I²C settings: port, SDA/SCL pins, bus frequency (400 kHz by default)
 - Stack buffer size used for short writes
-- Measurement mode: choose between FORCED_PERIODIC_ONE_TIME, FORCED_PERIODIC_BURST, NORMAL_PERIODIC, NORMAL_CONTINUOUSLY
+- Measurement mode: choose between FORCED_PERIODIC_ONE_TIME, FORCED_PERIODIC_BURST, NORMAL_PERIODIC, NORMAL_CONTINUOUS
 - Timing parameters: report period, burst sample count, median enable, extra margin for NORMAL pulse mode
 
 ---
