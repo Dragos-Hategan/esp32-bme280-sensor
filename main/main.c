@@ -1,17 +1,11 @@
-#include <stdlib.h>
 #include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/i2c_master.h"
-#include "esp_log.h"
-#include "esp_err.h"
-#include "esp_rom_sys.h"
 
 #include "config.h"
-#include "bme280.h"
-#include "bme280_i2c.h"
 #include "bme280_config.h"
 #include "bme280_read.h"
+#include "bme280_i2c.h"
+
+#include "esp_log.h"
 
 const char *TAG = "BME280_EX";
 
